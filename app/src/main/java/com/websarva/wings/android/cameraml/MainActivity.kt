@@ -7,12 +7,14 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.view.View
 import android.widget.ImageView
+import com.google.firebase.analytics.FirebaseAnalytics
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
     }
+    //private lateinit var firebaseAnalytics: FirebaseAnalytics
 
     public override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         //カメラアプリからの戻り値でかつ撮影成功の場合

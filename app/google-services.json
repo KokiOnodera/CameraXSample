@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "488493554259",
+    "project_id": "mltest-919",
+    "storage_bucket": "mltest-919.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:488493554259:android:bc71c2fda1f2ffdaba44a6",
+        "android_client_info": {
+          "package_name": "com.websarva.wings.android.cameraml"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "488493554259-04o7ndrfodhagcic30qk62p7ji4bikf5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAysKl3R4aExXStshvwof_JFH9r4tlr6xA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "488493554259-04o7ndrfodhagcic30qk62p7ji4bikf5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
