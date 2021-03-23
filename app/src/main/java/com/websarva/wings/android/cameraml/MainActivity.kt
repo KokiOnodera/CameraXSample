@@ -12,12 +12,35 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.Executors
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
+
+private class FaceAnalyzer(private var listener: (Int) -> Unit) : ImageAnalysis.Analyzer {
+    private val detector = FaceDetection.getClient()
+
+    @ExperimentalGetImage
+    override fun analyze(imageProxy: ImageProxy) {
+
+        val mediaImage = imageProxy.image ?: return
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
+        detector.process(image)
+                .addOnSuccessListener { faces ->
+                    listener(faces.size)
+                }
+                .addOnFailureListener { e ->
+                    Log.e("FaceAnalyzer", "Face detection failure.", e)
+                }
+                .addOnCompleteListener {
+                    imageProxy.close()
+                }
+    }
+}
 
 class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
@@ -62,6 +85,14 @@ class MainActivity : AppCompatActivity() {
 
             imageCapture = ImageCapture.Builder()
                     .build()
+            val imageAnalyzer = ImageAnalysis.Builder()
+                    .build()
+                    .also {
+                        it.setAnalyzer(cameraExecutor, FaceAnalyzer {faces ->
+                            Log.d(TAG, "Face detected: $faces")
+                            camera_capture_button.setEnabled(faces > 0)
+                        })
+                    }
 
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -72,7 +103,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                        this, cameraSelector, preview, imageCapture)
+                        this, cameraSelector, preview, imageCapture,imageAnalyzer)
 
             } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
