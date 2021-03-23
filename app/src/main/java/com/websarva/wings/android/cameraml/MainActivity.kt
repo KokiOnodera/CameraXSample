@@ -1,128 +1,187 @@
 package com.websarva.wings.android.cameraml
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
-import android.os.Build
-import android.os.Bundle
-import android.provider.MediaStore
-import android.util.Log
-import android.util.SparseIntArray
-import android.view.Surface
-import android.view.View
-import android.widget.ImageView
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.ml.vision.common.FirebaseVisionImage
-import com.google.firebase.ml.vision.common.FirebaseVisionImageMetadata
-import com.google.firebase.ml.vision.face.*
+import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.util.Log
+import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import java.util.concurrent.Executors
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
+import kotlinx.android.synthetic.main.activity_main.*
+import java.io.File
+import java.nio.ByteBuffer
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.concurrent.ExecutorService
+typealias LumaListener = (luma: Double) -> Unit
 
+private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
 
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-    }
-    //private lateinit var firebaseAnalytics: FirebaseAnalytics
-
-    public override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        //カメラアプリからの戻り値でかつ撮影成功の場合
-        if (resultCode == RESULT_OK) {
-            //撮影された画像のビットマップデータを取得。
-            val bitmap = data?.getParcelableExtra<Bitmap>("data")
-            //画像を表示するImageViewを取得
-            val ivCamera = findViewById<ImageView>(R.id.ivCamera)
-            //撮影された画像をImageViewに設定
-            ivCamera.setImageBitmap(bitmap)
-        }
-    }
-
-    fun onCameraImageClick(view: View) {
-        //intentオブジェクトを生成
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        //アクティビティを起動
-        startActivityForResult(intent, 200)
+    private fun ByteBuffer.toByteArray(): ByteArray {
+        rewind()    // Rewind the buffer to zero
+        val data = ByteArray(remaining())
+        get(data)   // Copy the buffer into a byte array
+        return data // Return the byte array
     }
 
-    //ここから顔認証記述　**MLkitを利用　URL:https://firebase.google.com/docs/ml-kit/android/detect-faces?hl=ja**
+    override fun analyze(image: ImageProxy) {
 
-    // High-accuracy landmark detection and face classification
-    val highAccuracyOpts = FirebaseVisionFaceDetectorOptions.Builder()
-            .setPerformanceMode(FirebaseVisionFaceDetectorOptions.ACCURATE)
-            .setLandmarkMode(FirebaseVisionFaceDetectorOptions.ALL_LANDMARKS)
-            .setClassificationMode(FirebaseVisionFaceDetectorOptions.ALL_CLASSIFICATIONS)
-            .build()
+        val buffer = image.planes[0].buffer
+        val data = buffer.toByteArray()
+        val pixels = data.map { it.toInt() and 0xFF }
+        val luma = pixels.average()
 
-    // Real-time contour detection of multiple faces
-    val realTimeOpts = FirebaseVisionFaceDetectorOptions.Builder()
-            .setContourMode(FirebaseVisionFaceDetectorOptions.ALL_CONTOURS)
-            .build()
+        listener(luma)
 
-//    private class YourImageAnalyzer : ImageAnalysis.Analyzer {
-//        private fun degreesToFirebaseRotation(degrees: Int): Int = when (degrees) {
-//            0 -> FirebaseVisionImageMetadata.ROTATION_0
-//            90 -> FirebaseVisionImageMetadata.ROTATION_90
-//            180 -> FirebaseVisionImageMetadata.ROTATION_180
-//            270 -> FirebaseVisionImageMetadata.ROTATION_270
-//            else -> throw Exception("Rotation must be 0, 90, 180, or 270.")
-//        }
-//        override fun analyze(imageProxy: ImageProxy?, degrees: Int) {
-//            val mediaImage = imageProxy?.image
-//            val imageRotation = degreesToFirebaseRotation(degrees)
-//            if (mediaImage != null) {
-//                val image = FirebaseVisionImage.fromMediaImage(mediaImage, imageRotation)
-//                // Pass image to an ML Kit Vision API
-//                // ...
-//            }
-//        }
-//    }
-    private val ORIENTATIONS = SparseIntArray()
-
-    init {
-        ORIENTATIONS.append(Surface.ROTATION_0, 90)
-        ORIENTATIONS.append(Surface.ROTATION_90, 0)
-        ORIENTATIONS.append(Surface.ROTATION_180, 270)
-        ORIENTATIONS.append(Surface.ROTATION_270, 180)
-    }
-    /**
-     * Get the angle by which an image must be rotated given the device's current
-     * orientation.
-     */
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    @Throws(CameraAccessException::class)
-    private fun getRotationCompensation(cameraId: String, activity: Activity, context: Context): Int {
-        // Get the device's current rotation relative to its "native" orientation.
-        // Then, from the ORIENTATIONS table, look up the angle the image must be
-        // rotated to compensate for the device's rotation.
-        val deviceRotation = activity.windowManager.defaultDisplay.rotation
-        var rotationCompensation = ORIENTATIONS.get(deviceRotation)
-
-        // On most devices, the sensor orientation is 90 degrees, but for some
-        // devices it is 270 degrees. For devices with a sensor orientation of
-        // 270, rotate the image an additional 180 ((270 + 270) % 360) degrees.
-        val cameraManager = context.getSystemService(CAMERA_SERVICE) as CameraManager
-        val sensorOrientation = cameraManager
-                .getCameraCharacteristics(cameraId)
-                .get(CameraCharacteristics.SENSOR_ORIENTATION)!!
-        rotationCompensation = (rotationCompensation + sensorOrientation + 270) % 360
-
-        // Return the corresponding FirebaseVisionImageMetadata rotation value.
-        val result: Int
-        when (rotationCompensation) {
-            0 -> result = FirebaseVisionImageMetadata.ROTATION_0
-            90 -> result = FirebaseVisionImageMetadata.ROTATION_90
-            180 -> result = FirebaseVisionImageMetadata.ROTATION_180
-            270 -> result = FirebaseVisionImageMetadata.ROTATION_270
-            else -> {
-                result = FirebaseVisionImageMetadata.ROTATION_0
-                //Log.e(TAG, "Bad rotation value: $rotationCompensation")
-            }
-        }
-        return result
+        image.close()
     }
 }
 
+
+class MainActivity : AppCompatActivity() {
+    private var imageCapture: ImageCapture? = null
+
+    private lateinit var outputDirectory: File
+    private lateinit var cameraExecutor: ExecutorService
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        // Request camera permissions
+        if (allPermissionsGranted()) {
+            startCamera()
+        } else {
+            ActivityCompat.requestPermissions(
+                    this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+        }
+
+        // Set up the listener for take photo button
+        camera_capture_button.setOnClickListener { takePhoto() }
+
+        outputDirectory = getOutputDirectory()
+
+        cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    //プレビューのユースケース
+    private fun startCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        cameraProviderFuture.addListener(Runnable {
+            // Used to bind the lifecycle of cameras to the lifecycle owner
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+
+            // Preview
+            val preview = Preview.Builder()
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(viewFinder.surfaceProvider)
+                    }
+
+            imageCapture = ImageCapture.Builder()
+                    .build()
+
+            val imageAnalyzer = ImageAnalysis.Builder()
+                    .build()
+                    .also {
+                        it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
+                            Log.d(TAG, "Average luminosity: $luma")
+                        })
+                    }
+
+
+            // Select back camera as a default
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                // Unbind use cases before rebinding
+                cameraProvider.unbindAll()
+
+                // Bind use cases to camera
+                cameraProvider.bindToLifecycle(
+                        this, cameraSelector, preview, imageCapture,imageAnalyzer)
+
+            } catch(exc: Exception) {
+                Log.e(TAG, "Use case binding failed", exc)
+            }
+
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+
+    //ImageCaptureユースケース
+    private fun takePhoto() {
+        // Get a stable reference of the modifiable image capture use case
+        val imageCapture = imageCapture ?: return
+
+        // Create time-stamped output file to hold the image
+        val photoFile = File(
+                outputDirectory,
+                SimpleDateFormat(FILENAME_FORMAT, Locale.US
+                ).format(System.currentTimeMillis()) + ".jpg")
+
+        // Create output options object which contains file + metadata
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+        // Set up image capture listener, which is triggered after photo has
+        // been taken
+        imageCapture.takePicture(
+                outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
+            override fun onError(exc: ImageCaptureException) {
+                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+            }
+
+            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                val savedUri = Uri.fromFile(photoFile)
+                val msg = "Photo capture succeeded: $savedUri"
+                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                Log.d(TAG, msg)
+            }
+        })
+    }
+
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(
+                baseContext, it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun getOutputDirectory(): File {
+        val mediaDir = externalMediaDirs.firstOrNull()?.let {
+            File(it, resources.getString(R.string.app_name)).apply { mkdirs() } }
+        return if (mediaDir != null && mediaDir.exists())
+            mediaDir else filesDir
+    }
+
+    override fun onRequestPermissionsResult(
+            requestCode: Int, permissions: Array<String>, grantResults:
+            IntArray) {
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (allPermissionsGranted()) {
+                startCamera()
+            } else {
+                Toast.makeText(this,
+                        "Permissions not granted by the user.",
+                        Toast.LENGTH_SHORT).show()
+                finish()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraExecutor.shutdown()
+    }
+
+    companion object {
+        private const val TAG = "CameraXBasic"
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+    }
+}
