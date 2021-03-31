@@ -1,4 +1,15 @@
 <resources>
     <string name="app_name">目認識</string>
     <string name="measure_start">スタート</string>
+    <string name="take_photo">Take Photo</string>
+    <!--ユーザ登録-->
+    <string name="enter_name">名前を入力してください</string>
+    <!--顔の生体情報を登録するときの説明文-->
+    <string name="face_recognition_tutorial">目の特徴データを登録します。
+        マスクを着用した状態で顔をカメラの枠内に入れてください</string>
+    <!--端末加速度、端末角度データを登録するときの説明文-->
+    <string name="terminal_acceleration_angle_tutorial">端末加速度、端末角度データを
+        登録します。端末を一度手から離し、開始ボタンを押してのち、端末を顔まで持ってきてください。</string>
+    <string name="start">開始</string>
+
 </resources>
