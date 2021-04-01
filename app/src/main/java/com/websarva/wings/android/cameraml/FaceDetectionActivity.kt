@@ -20,6 +20,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 
+
+//顔認証画面
+
 private class FaceAnalyzer(private var listener: (Int) -> Unit) : ImageAnalysis.Analyzer {
     private val detector = FaceDetection.getClient()
 
