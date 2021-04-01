@@ -12,8 +12,9 @@ class FaceRecognitionTutorial:AppCompatActivity(){
         super.onCreate(savedInstanceState)
         setContentView(R.layout.regist_tutorial)
         val StartButton = findViewById<Button>(R.id.start_button)
-        //新規作成ボタンが押されたら
+        //開始ボタンが押されたら
         StartButton.setOnClickListener {
+            //顔認証の画面に遷移
             val intent = Intent(application, FaceDetectionActivity::class.java)
             startActivity(intent)
         }
