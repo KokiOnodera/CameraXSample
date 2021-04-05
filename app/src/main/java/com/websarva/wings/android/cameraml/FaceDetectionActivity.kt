@@ -1,24 +1,27 @@
 package com.websarva.wings.android.cameraml
 
-import androidx.appcompat.app.AppCompatActivity
-import android.os.Bundle
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.net.Uri
+import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.*
+import androidx.camera.core.CameraX.*
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import java.util.concurrent.Executors
-import androidx.camera.core.*
-import androidx.camera.lifecycle.ProcessCameraProvider
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 
 //顔認証画面
@@ -45,7 +48,6 @@ private class FaceAnalyzer(private var listener: (Int) -> Unit) : ImageAnalysis.
     }
 }
 
-
 open class FaceDetectionActivity: AppCompatActivity(){
     private var imageCapture: ImageCapture? = null
 
@@ -64,20 +66,36 @@ open class FaceDetectionActivity: AppCompatActivity(){
                     this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
 
-        // Set up the listener for take photo button
-        camera_capture_button.setOnClickListener { takePhoto() }
+        // 写真を撮るボタンのリスナーを設定する
+        eye_feature_value.setOnClickListener {
+            //takePhoto()
+        }
 
         outputDirectory = getOutputDirectory()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+
+
+        //https://developers.google.com/ml-kit/vision/face-detection/android
+        val highAccuracyOpts = FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+            .build()
+
+        // リアルタイムの輪郭検出
+        val realTimeOpts = FaceDetectorOptions.Builder()
+            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
+            .build()
     }
 
+    @SuppressLint("RestrictedApi", "SetTextI18n")
     //プレビューのユースケース
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener(Runnable {
-            // Used to bind the lifecycle of cameras to the lifecycle owner
+            // カメラのライフサイクルをライフサイクル所有者にバインドするために使用されます
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
             // Preview
@@ -89,63 +107,70 @@ open class FaceDetectionActivity: AppCompatActivity(){
 
             imageCapture = ImageCapture.Builder()
                     .build()
-            val imageAnalyzer = ImageAnalysis.Builder()
+
+            //activity_main.xmlで設定したtextview（目の特徴値）に数値を設定
+            val textView = findViewById<View>(R.id.eye_feature_value) as TextView
+            //試験的に42を設定
+            val value: Int = 42
+            textView.setText(value.toString())
+
+            val feature = ImageAnalysis.Builder()
                     .build()
                     .also {
-                        it.setAnalyzer(cameraExecutor, FaceAnalyzer {faces ->
+                        it.setAnalyzer(cameraExecutor, FaceAnalyzer { faces ->
                             Log.d(TAG, "Face detected: $faces")
-                            camera_capture_button.setEnabled(faces > 0)
+                            eye_feature_value.setEnabled(faces > 0)
                         })
                     }
 
-            // Select back camera as a default
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            // デフォルトとしてフロントカメラを選択
+            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
 
             try {
-                // Unbind use cases before rebinding
+                // 再バインドする前にユースケースのバインドを解除する
                 cameraProvider.unbindAll()
 
-                // Bind use cases to camera
+                // ユースケースをカメラにバインドする
                 cameraProvider.bindToLifecycle(
-                        this, cameraSelector, preview, imageCapture,imageAnalyzer)
+                        this, cameraSelector, preview, imageCapture, feature)
 
-            } catch(exc: Exception) {
+            } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
-    //ImageCaptureユースケース
-    private fun takePhoto() {
-        // Get a stable reference of the modifiable image capture use case
-        val imageCapture = imageCapture ?: return
-
-        // Create time-stamped output file to hold the image
-        val photoFile = File(
-                outputDirectory,
-                SimpleDateFormat(FILENAME_FORMAT, Locale.US
-                ).format(System.currentTimeMillis()) + ".jpg")
-
-        // Create output options object which contains file + metadata
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
-        // Set up image capture listener, which is triggered after photo has
-        // been taken
-        imageCapture.takePicture(
-                outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
-            override fun onError(exc: ImageCaptureException) {
-                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-            }
-
-            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                val savedUri = Uri.fromFile(photoFile)
-                val msg = "Photo capture succeeded: $savedUri"
-                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-                Log.d(TAG, msg)
-            }
-        })
-    }
+//    //ImageCaptureユースケース
+//    private fun takePhoto() {
+//        // 変更可能な画像キャプチャのユースケースの安定したリファレンスを取得する
+//        val imageCapture = imageCapture ?: return
+//
+//        // 画像を保持するためのタイムスタンプ付き出力ファイルを作成します
+//        val photoFile = File(
+//                outputDirectory,
+//                SimpleDateFormat(FILENAME_FORMAT, Locale.US
+//                ).format(System.currentTimeMillis()) + ".jpg")
+//
+//        // ファイルとメタデータを含む出力オプションオブジェクトを作成します
+//        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+//
+//        // Set up image capture listener, which is triggered after photo has
+//        // been taken
+//        imageCapture.takePicture(
+//                outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
+//            override fun onError(exc: ImageCaptureException) {
+//                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+//            }
+//
+//            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+//                val savedUri = Uri.fromFile(photoFile)
+//                val msg = "Photo capture succeeded: $savedUri"
+//                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+//                Log.d(TAG, msg)
+//            }
+//        })
+//    }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
