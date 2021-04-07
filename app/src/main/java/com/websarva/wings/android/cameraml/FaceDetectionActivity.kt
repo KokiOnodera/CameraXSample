@@ -2,6 +2,7 @@ package com.websarva.wings.android.cameraml
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -10,16 +11,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
-import androidx.camera.core.CameraX.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.*
 import kotlinx.android.synthetic.main.activity_main.*
-import java.io.File
-import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -27,7 +24,14 @@ import java.util.concurrent.Executors
 //顔認証画面
 
 private class FaceAnalyzer(private var listener: (Int) -> Unit) : ImageAnalysis.Analyzer {
-    private val detector = FaceDetection.getClient()
+    val options = FaceDetectorOptions.Builder()
+        .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+        .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+        .setMinFaceSize(0.15f)
+        .enableTracking()
+        .build()
+    val detector = FaceDetection.getClient()
 
     @ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
@@ -48,45 +52,24 @@ private class FaceAnalyzer(private var listener: (Int) -> Unit) : ImageAnalysis.
     }
 }
 
-open class FaceDetectionActivity: AppCompatActivity(){
+class FaceDetectionActivity: AppCompatActivity(){
+
     private var imageCapture: ImageCapture? = null
 
-    private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // Request camera permissions
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        // カメラのパーミッションをリクエスト
         if (allPermissionsGranted()) {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
                     this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
-
-        // 写真を撮るボタンのリスナーを設定する
-        eye_feature_value.setOnClickListener {
-            //takePhoto()
-        }
-
-        outputDirectory = getOutputDirectory()
-
         cameraExecutor = Executors.newSingleThreadExecutor()
-
-
-        //https://developers.google.com/ml-kit/vision/face-detection/android
-        val highAccuracyOpts = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .build()
-
-        // リアルタイムの輪郭検出
-        val realTimeOpts = FaceDetectorOptions.Builder()
-            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
-            .build()
     }
 
     @SuppressLint("RestrictedApi", "SetTextI18n")
@@ -110,16 +93,18 @@ open class FaceDetectionActivity: AppCompatActivity(){
 
             //activity_main.xmlで設定したtextview（目の特徴値）に数値を設定
             val textView = findViewById<View>(R.id.eye_feature_value) as TextView
-            //試験的に42を設定
-            val value: Int = 42
-            textView.setText(value.toString())
 
             val feature = ImageAnalysis.Builder()
                     .build()
                     .also {
                         it.setAnalyzer(cameraExecutor, FaceAnalyzer { faces ->
                             Log.d(TAG, "Face detected: $faces")
-                            eye_feature_value.setEnabled(faces > 0)
+                                    //eye_feature_value.setEnabled(faces > 0)
+                            textView.setText(R.string.in_frame)
+                            //顔を認識したら
+                            if(faces>0) {
+                                textView.setText(R.string.registering)
+                            }
                         })
                     }
 
@@ -141,47 +126,9 @@ open class FaceDetectionActivity: AppCompatActivity(){
         }, ContextCompat.getMainExecutor(this))
     }
 
-//    //ImageCaptureユースケース
-//    private fun takePhoto() {
-//        // 変更可能な画像キャプチャのユースケースの安定したリファレンスを取得する
-//        val imageCapture = imageCapture ?: return
-//
-//        // 画像を保持するためのタイムスタンプ付き出力ファイルを作成します
-//        val photoFile = File(
-//                outputDirectory,
-//                SimpleDateFormat(FILENAME_FORMAT, Locale.US
-//                ).format(System.currentTimeMillis()) + ".jpg")
-//
-//        // ファイルとメタデータを含む出力オプションオブジェクトを作成します
-//        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-//
-//        // Set up image capture listener, which is triggered after photo has
-//        // been taken
-//        imageCapture.takePicture(
-//                outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
-//            override fun onError(exc: ImageCaptureException) {
-//                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-//            }
-//
-//            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-//                val savedUri = Uri.fromFile(photoFile)
-//                val msg = "Photo capture succeeded: $savedUri"
-//                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-//                Log.d(TAG, msg)
-//            }
-//        })
-//    }
-
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
                 baseContext, it) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun getOutputDirectory(): File {
-        val mediaDir = externalMediaDirs.firstOrNull()?.let {
-            File(it, resources.getString(R.string.app_name)).apply { mkdirs() } }
-        return if (mediaDir != null && mediaDir.exists())
-            mediaDir else filesDir
     }
 
     override fun onRequestPermissionsResult(

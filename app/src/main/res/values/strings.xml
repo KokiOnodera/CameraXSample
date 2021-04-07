@@ -16,6 +16,10 @@
         登録します。端末を一度手から離し、開始ボタンを押してのち、端末を顔まで持ってきてください。</string>
     <string name="start">開始</string>
 
+    <!--顔の特徴データ登録画面での文-->
+    <string name="in_frame">顔をカメラ内にいれてください</string>
+    <string name="registering">登録中です…</string>
+
     <string name="value">1000</string>
 
 </resources>
