@@ -47,6 +47,8 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics:18.0.2'
     implementation 'com.google.android.gms:play-services-maps:17.0.0'
     implementation 'com.google.firebase:firebase-firestore:22.1.2'
+    implementation 'com.google.firebase:firebase-installations:16.3.5'
+    //implementation 'com.google.firebase:firebase-messaging:21.0.1'
     //ここから追加
     //CameraX
     def camerax_version = "1.0.0-beta07"
@@ -72,4 +74,5 @@ dependencies {
     //Fire storeライブラリ
     implementation 'com.google.firebase:firebase-firestore-ktx'
     //ここまで
+
 }

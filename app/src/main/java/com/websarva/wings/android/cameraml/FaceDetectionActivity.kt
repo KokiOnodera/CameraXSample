@@ -2,11 +2,13 @@ package com.websarva.wings.android.cameraml
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -62,6 +64,13 @@ class FaceDetectionActivity: AppCompatActivity(){
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
+        val MainMenuButton = findViewById<Button>(R.id.button)
+        MainMenuButton.setOnClickListener {
+            val intent = Intent(application, MainActivity::class.java)
+            startActivity(intent)
+        }
+
         // カメラのパーミッションをリクエスト
         if (allPermissionsGranted()) {
             startCamera()

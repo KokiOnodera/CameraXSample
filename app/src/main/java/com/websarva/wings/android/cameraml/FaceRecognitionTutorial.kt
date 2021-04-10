@@ -11,8 +11,10 @@ class FaceRecognitionTutorial:AppCompatActivity(){
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.regist_tutorial)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         val StartButton = findViewById<Button>(R.id.start_button)
         //開始ボタンが押されたら
+
         StartButton.setOnClickListener {
             //顔認証の画面に遷移
             val intent = Intent(application, FaceDetectionActivity::class.java)
